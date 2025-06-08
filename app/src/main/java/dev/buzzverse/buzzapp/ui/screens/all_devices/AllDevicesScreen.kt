@@ -18,6 +18,7 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -25,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import dev.buzzverse.buzzapp.model.DiscoveredPeripheral
+import dev.buzzverse.buzzapp.model.LocationData
 import dev.buzzverse.buzzapp.service.BluetoothViewModel
 
 @Composable
@@ -34,6 +36,18 @@ fun AllDevicesScreen(
     val discoveredPeripherals by viewModel.discoveredPeripherals.collectAsState()
     val connectedPeripheral by viewModel.connectedPeripheral.collectAsState()
     val isConnecting by viewModel.isConnecting.collectAsState()
+
+    val connectedDeviceDetails by viewModel.connectedPeripheral.collectAsState()
+    if (connectedDeviceDetails?.isWritePending == true) {
+        Text("Writing data...")
+    }
+    connectedDeviceDetails?.writeSuccess?.let { success ->
+        Text(if (success) "Write successful!" else "Write failed.")
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.initializeBluetoothComponents()
+    }
 
         Column(
             modifier = Modifier
@@ -127,12 +141,6 @@ fun ConnectedPeripheralView(peripheral: DiscoveredPeripheral, viewModel: Bluetoo
             Text("Connected to: ${peripheral.displayName}", style = MaterialTheme.typography.titleLarge)
             Text("Address: ${peripheral.device.address}")
             Text("RSSI: ${peripheral.rssi ?: "N/A"}")
-            peripheral.sensorCharacteristic?.let {
-                Text("Sensor Char: ${it.uuid.toString().takeLast(10)}")
-            }
-            peripheral.locationCharacteristic?.let {
-                Text("Location Char: ${it.uuid.toString().takeLast(10)}")
-            }
 
             if (peripheral.isWritePending) {
                 Text("Write pending...")
@@ -140,14 +148,25 @@ fun ConnectedPeripheralView(peripheral: DiscoveredPeripheral, viewModel: Bluetoo
                 Text(if (peripheral.writeSuccess == true) "Write successful!" else "Write failed.")
             }
 
+            peripheral.sensorData.let { sensorData ->
+                Text("Temperature: ${sensorData?.temperature ?: "N/A"} °C")
+                Text("Humidity: ${sensorData?.humidity ?: "N/A"} %")
+                Text("Pressure: ${sensorData?.pressure ?: "N/A"} hPa")
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = {
-                    val testData = "HelloBT".toByteArray()
-                    viewModel.writeDataToSensorCharacteristic(testData)
+                    val locationProto = LocationData.newBuilder()
+                        .setAltitude(1234)
+                        .setLatitude(34567890)
+                        .setLongitude(-123456789)
+                        .build()
+                    val dataBytes = locationProto.toByteArray()
+                    viewModel.writeDataToSensorCharacteristic(dataBytes)
                 }) {
-                    Text("Write 'HelloBT'")
+                    Text("Write LocationData")
                 }
                 Button(onClick = { viewModel.readSensorData() }) {
                     Text("Read Sensor")
