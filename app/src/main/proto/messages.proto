@@ -1,0 +1,15 @@
+syntax = "proto3";
+option java_package = "dev.buzzverse.buzzapp.model";
+option java_multiple_files = true;
+
+message SensorData {
+    optional float temperature = 1;
+    optional float pressure = 2;
+    optional float humidity = 3;
+}
+
+message LocationData {
+    optional uint32 altitude = 2;
+    optional sint32 latitude = 3;
+    optional sint32 longitude = 4;
+}

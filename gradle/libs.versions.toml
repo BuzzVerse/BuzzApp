@@ -19,8 +19,10 @@ kotlinxCoroutinesCore = "1.7.3"
 navigationCompose = "2.8.3"
 playServicesLocation = "21.3.0"
 retrofit = "2.9.0"
+protoBuf = "3.21.4"
 
 [libraries]
+protobuf = { group = "com.google.protobuf", name = "protobuf-javalite", version.ref = "protoBuf" }
 androidx-activity-ktx = { module = "androidx.activity:activity-ktx", version.ref = "activityKtx" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-fragment-ktx = { module = "androidx.fragment:fragment-ktx", version.ref = "fragmentKtx" }
@@ -54,4 +56,4 @@ androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-view
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-
+google-protobuf = { id = "com.google.protobuf", version = "0.9.3" }
