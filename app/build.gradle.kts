@@ -84,6 +84,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.livedata.ktx)
     implementation(libs.play.services.location)
+    implementation(libs.compose.charts)
 
     implementation(libs.gson)
     implementation(libs.retrofit)

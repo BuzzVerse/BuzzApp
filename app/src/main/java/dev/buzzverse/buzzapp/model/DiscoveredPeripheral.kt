@@ -9,8 +9,6 @@ data class DiscoveredPeripheral(
     var advertisedDataString: String,
     var servicesDiscovered: Boolean = false,
     var sensorData: SensorData? = null,
-    var isWritePending: Boolean = false,
-    var writeSuccess: Boolean? = null
 ) {
 
     val displayName: String

@@ -27,11 +27,14 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.buzzverse.buzzapp.model.DiscoveredPeripheral
 import dev.buzzverse.buzzapp.model.SensorData
+import dev.buzzverse.buzzapp.model.SensorSample
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -63,6 +66,11 @@ class BluetoothViewModel @Inject constructor(
     private val internalScanActive = AtomicBoolean(false)
 
     private var connectedGatt: BluetoothGatt? = null
+
+    private val _sensorHistory = MutableStateFlow<List<SensorSample>>(emptyList())
+    val sensorHistory: StateFlow<List<SensorSample>> = _sensorHistory.asStateFlow()
+
+    private var pollingJob: Job? = null
 
     companion object {
         private const val TAG = "BluetoothViewModel"
@@ -140,8 +148,6 @@ class BluetoothViewModel @Inject constructor(
     }
 
     fun startScan() {
-        Log.i(TAG, "Attempting to start scan...")
-
         if (bluetoothAdapter == null) {
             Log.w(TAG, "Bluetooth adapter not initialized. Trying to initialize components first.")
             initializeBluetoothComponents()
@@ -191,7 +197,6 @@ class BluetoothViewModel @Inject constructor(
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
             .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
-            .setReportDelay(0)
             .build()
 
         try {
@@ -359,9 +364,7 @@ class BluetoothViewModel @Inject constructor(
         _connectedPeripheral.update {
             it?.copy(
                 servicesDiscovered = false,
-                sensorData = null,
-                isWritePending = false,
-                writeSuccess = null
+                sensorData = null
             )
         }
         _connectedPeripheral.value = null
@@ -467,7 +470,7 @@ class BluetoothViewModel @Inject constructor(
                         servicesDiscovered   = true
                     )
                 }
-                readSensorData()
+                startSensorPolling()
             } else {
                 Log.e(TAG, "Service discovery failed for $deviceAddress with status: $status")
                 cleanupConnection("Service discovery failed (Status: $status)")
@@ -502,9 +505,19 @@ class BluetoothViewModel @Inject constructor(
         ) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 try {
-                    val sensorData = SensorData.parseFrom(value)
-                    _connectedPeripheral.update { it?.copy(sensorData = sensorData) }
-                    Log.i(TAG, "SensorData parsed: $sensorData")
+                    val sensor = SensorData.parseFrom(value)
+                    val sample = SensorSample(
+                        System.currentTimeMillis(),
+                        sensor.temperature.toFloat(),
+                        sensor.pressure.toFloat(),
+                        sensor.humidity.toFloat()
+                    )
+                    _sensorHistory.update { old ->
+                        (old + sample).takeLast(120)
+                    }
+
+                    _connectedPeripheral.update { it?.copy(sensorData = sensor) }
+                    Log.i(TAG, "SensorData parsed: $sensor")
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to parse SensorData", e)
                 }
@@ -517,9 +530,6 @@ class BluetoothViewModel @Inject constructor(
             val deviceAddress = gatt.device.address
             Log.d(TAG, "onCharacteristicWrite to $deviceAddress, characteristic ${characteristic.uuid}, status $status")
 
-            _connectedPeripheral.update { cp ->
-                cp?.copy(isWritePending = false, writeSuccess = (status == BluetoothGatt.GATT_SUCCESS))
-            }
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 Log.i(TAG, "Successfully wrote to sensor characteristic.")
             } else {
@@ -527,8 +537,8 @@ class BluetoothViewModel @Inject constructor(
             }
         }
 
-        override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
-            Log.d(TAG, "onCharacteristicChanged for ${characteristic.uuid}, value: ${value.toHexString()}")
+        override fun onReadRemoteRssi(gatt: BluetoothGatt?, rssi: Int, status: Int) {
+            _connectedPeripheral.update { it?.copy(rssi = rssi) }
         }
     }
 
@@ -548,12 +558,8 @@ class BluetoothViewModel @Inject constructor(
             return
         }
 
-        val started = gatt.readCharacteristic(char)
-        if (started) {
-            Log.i(TAG, "readSensorData: Read initiated.")
-        } else {
-            Log.e(TAG, "readSensorData: readCharacteristic() returned false.")
-        }
+        gatt.readCharacteristic(char)
+        gatt.readRemoteRssi()
     }
 
     fun writeDataToSensorCharacteristic(data: ByteArray) {
@@ -569,31 +575,37 @@ class BluetoothViewModel @Inject constructor(
             BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
         } else {
             Log.e(TAG, "writeDataToSensorCharacteristic: Sensor characteristic is not writable.")
-            _connectedPeripheral.update { it?.copy(isWritePending = false, writeSuccess = false) }
             return
         }
 
-        _connectedPeripheral.update { it?.copy(isWritePending = true, writeSuccess = null) }
 
         val success: Boolean
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val result = gatt.writeCharacteristic(char, data, writeType)
             success = result == BluetoothStatusCodes.SUCCESS
             if (!success) Log.e(TAG, "writeDataToSensorCharacteristic (API 33+) failed to initiate: $result")
-
         } else {
             char.value = data
             char.writeType = writeType
             success = gatt.writeCharacteristic(char)
             if (!success) Log.e(TAG, "writeDataToSensorCharacteristic (Legacy): Failed to initiate characteristic write.")
         }
+    }
 
-        if (success) {
-            Log.i(TAG, "writeDataToSensorCharacteristic: Initiated write for sensor characteristic.")
-        } else {
-            // If initiation failed, immediately update pending state
-            _connectedPeripheral.update { it?.copy(isWritePending = false, writeSuccess = false) }
+    private fun startSensorPolling(periodMillis: Long = 5_000L) {
+        if (pollingJob != null) return
+
+        pollingJob = viewModelScope.launch {
+            while (isActive && connectedGatt != null) {
+                readSensorData()
+                delay(periodMillis)
+            }
         }
+    }
+
+    private fun stopSensorPolling() {
+        pollingJob?.cancel()
+        pollingJob = null
     }
 
     private fun BluetoothGatt.findSensorCharacteristic(): BluetoothGattCharacteristic? =
@@ -605,6 +617,4 @@ class BluetoothViewModel @Inject constructor(
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         return locationManager.isLocationEnabled
     }
-
-    private fun ByteArray.toHexString(): String = joinToString(separator = "") { "%02x".format(it) }
 }

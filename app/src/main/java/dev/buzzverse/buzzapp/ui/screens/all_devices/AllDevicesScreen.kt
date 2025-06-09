@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,6 +30,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import dev.buzzverse.buzzapp.model.DiscoveredPeripheral
 import dev.buzzverse.buzzapp.model.LocationData
 import dev.buzzverse.buzzapp.service.BluetoothViewModel
+import dev.buzzverse.buzzapp.ui.composables.SensorChart
 
 @Composable
 fun AllDevicesScreen(
@@ -37,55 +40,47 @@ fun AllDevicesScreen(
     val connectedPeripheral by viewModel.connectedPeripheral.collectAsState()
     val isConnecting by viewModel.isConnecting.collectAsState()
 
-    val connectedDeviceDetails by viewModel.connectedPeripheral.collectAsState()
-    if (connectedDeviceDetails?.isWritePending == true) {
-        Text("Writing data...")
-    }
-    connectedDeviceDetails?.writeSuccess?.let { success ->
-        Text(if (success) "Write successful!" else "Write failed.")
-    }
-
     LaunchedEffect(Unit) {
         viewModel.initializeBluetoothComponents()
     }
 
-        Column(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+    Column(
+        modifier = Modifier.fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (connectedPeripheral == null) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                Button(onClick = { viewModel.startScan() }, enabled = !isConnecting && connectedPeripheral == null) {
+                Button(onClick = { viewModel.startScan() }, enabled = !isConnecting) {
                     Text("Start Scan")
                 }
-                Button(onClick = { viewModel.stopScan() }, enabled = !isConnecting && connectedPeripheral == null) {
+                Button(onClick = { viewModel.stopScan() }, enabled = !isConnecting) {
                     Text("Stop Scan")
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-            if (isConnecting) {
-                Text("Connecting to ${connectedPeripheral?.displayName ?: "device"}...")
-                CircularProgressIndicator()
-            }
+        if (isConnecting) {
+            Text("Connecting to ${connectedPeripheral?.displayName ?: "device"}...")
+            CircularProgressIndicator()
+        }
 
-            connectedPeripheral?.let { peripheral ->
-                ConnectedPeripheralView(peripheral = peripheral, viewModel = viewModel)
-            } ?: run {
-                DiscoveredPeripheralsList(
-                    peripherals = discoveredPeripherals,
-                    onConnect = { viewModel.connectToDevice(it) },
-                    enabled = !isConnecting
-                )
-            }
+        connectedPeripheral?.let { peripheral ->
+            ConnectedPeripheralView(peripheral = peripheral, viewModel = viewModel)
+        } ?: run {
+            DiscoveredPeripheralsList(
+                peripherals = discoveredPeripherals,
+                onConnect = { viewModel.connectToDevice(it) },
+                enabled = !isConnecting
+            )
         }
     }
+}
 
 @Composable
 fun DiscoveredPeripheralsList(
@@ -136,48 +131,54 @@ fun PeripheralItem(
 
 @Composable
 fun ConnectedPeripheralView(peripheral: DiscoveredPeripheral, viewModel: BluetoothViewModel) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Connected to: ${peripheral.displayName}", style = MaterialTheme.typography.titleLarge)
-            Text("Address: ${peripheral.device.address}")
-            Text("RSSI: ${peripheral.rssi ?: "N/A"}")
+    val history by viewModel.sensorHistory.collectAsState()
 
-            if (peripheral.isWritePending) {
-                Text("Write pending...")
-            } else if (peripheral.writeSuccess != null) {
-                Text(if (peripheral.writeSuccess == true) "Write successful!" else "Write failed.")
-            }
+    val scrollState = rememberScrollState()
 
-            peripheral.sensorData.let { sensorData ->
-                Text("Temperature: ${sensorData?.temperature ?: "N/A"} °C")
-                Text("Humidity: ${sensorData?.humidity ?: "N/A"} %")
-                Text("Pressure: ${sensorData?.pressure ?: "N/A"} hPa")
-            }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+    ) {
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    "Connected to: ${peripheral.displayName}",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Text("Address: ${peripheral.device.address}")
+                Text("RSSI: ${peripheral.rssi ?: "N/A"}")
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = {
-                    val locationProto = LocationData.newBuilder()
-                        .setAltitude(1234)
-                        .setLatitude(34567890)
-                        .setLongitude(-123456789)
-                        .build()
-                    val dataBytes = locationProto.toByteArray()
-                    viewModel.writeDataToSensorCharacteristic(dataBytes)
-                }) {
-                    Text("Write LocationData")
+                peripheral.sensorData.let { sensorData ->
+                    Text("Temperature: ${sensorData?.temperature ?: "N/A"} °C")
+                    Text("Humidity: ${sensorData?.humidity ?: "N/A"} %")
+                    Text("Pressure: ${sensorData?.pressure ?: "N/A"} hPa")
                 }
-                Button(onClick = { viewModel.readSensorData() }) {
-                    Text("Read Sensor")
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = {
+                        val locationProto = LocationData.newBuilder()
+                            .setAltitude(1234)
+                            .setLatitude(34567890)
+                            .setLongitude(-123456789)
+                            .build()
+                        val dataBytes = locationProto.toByteArray()
+                        viewModel.writeDataToSensorCharacteristic(dataBytes)
+                    }) {
+                        Text("Write LocationData")
+                    }
                 }
-            }
 
 
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = { viewModel.disconnectFromDevice() }) {
-                Text("Disconnect")
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = { viewModel.disconnectFromDevice() }) {
+                    Text("Disconnect")
+                }
             }
         }
+
+        SensorChart(samples = history, modifier = Modifier.padding(top = 16.dp))
     }
 }
