@@ -1,3 +1,5 @@
 <resources>
-    <string name="app_name">BuzzApp</string>
+    <string name="app_name" translatable="false">BuzzApp</string>
+    <string name="connect">Connect</string>
+    <string name="devices">Devices</string>
 </resources>

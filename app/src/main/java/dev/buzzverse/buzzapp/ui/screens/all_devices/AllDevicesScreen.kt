@@ -25,8 +25,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import dev.buzzverse.buzzapp.R
 import dev.buzzverse.buzzapp.model.DiscoveredPeripheral
 import dev.buzzverse.buzzapp.model.LocationData
 import dev.buzzverse.buzzapp.service.BluetoothViewModel
@@ -124,7 +126,7 @@ fun PeripheralItem(
         }
         Text("RSSI: ${peripheral.rssi ?: "N/A"}")
         Button(onClick = onConnect, enabled = enabled) {
-            Text("Connect")
+            Text(stringResource(id = R.string.connect))
         }
     }
 }
