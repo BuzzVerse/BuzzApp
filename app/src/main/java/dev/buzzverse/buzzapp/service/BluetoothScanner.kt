@@ -33,6 +33,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.buzzverse.buzzapp.MainActivity
 import dev.buzzverse.buzzapp.R
 import dev.buzzverse.buzzapp.model.DiscoveredPeripheral
+import dev.buzzverse.buzzapp.model.LocationData
 import dev.buzzverse.buzzapp.model.SensorData
 import dev.buzzverse.buzzapp.model.SensorSample
 import kotlinx.coroutines.Job
@@ -50,7 +51,8 @@ import javax.inject.Inject
 @SuppressLint("MissingPermission")
 @HiltViewModel
 class BluetoothViewModel @Inject constructor(
-    private val app: Application
+    private val app: Application,
+    private val gpsServiceController: GpsServiceController,
 ) : ViewModel() {
 
     private val bluetoothManager: BluetoothManager =
@@ -466,6 +468,7 @@ class BluetoothViewModel @Inject constructor(
     private fun cleanupConnection(reason: String = "Unknown", notifyUser: Boolean = false) {
         Log.i(TAG, "Cleaning up connection. Reason: $reason. Notify: $notifyUser. Current GATT: ${connectedGatt?.device?.address}, Target: ${_connectedPeripheral.value?.device?.address}")
         stopSensorPolling()
+        gpsServiceController.stop()
 
         val previouslyConnectedDevice = _connectedPeripheral.value
         val gatt = connectedGatt
@@ -576,6 +579,7 @@ class BluetoothViewModel @Inject constructor(
 
                 if (sensorChar != null) {
                     startSensorPolling()
+                    gpsServiceController.start()
                 } else {
                     Log.w(TAG, "Sensor characteristic not found, not starting polling for $deviceName.")
                 }
@@ -710,6 +714,17 @@ class BluetoothViewModel @Inject constructor(
             Log.i(TAG, "Starting sensor polling every $periodMillis ms for ${connectedGatt?.device?.address}.")
             while (isActive && connectedGatt != null && _connectedPeripheral.value?.servicesDiscovered == true) {
                 readSensorData()
+                delay(periodMillis)
+                gpsServiceController.lastKnownLocation.let { location ->
+                    val latitude = location.value?.latitude ?: 0.0
+                    val longitude = location.value?.longitude ?: 0.0
+                    val locationProto = LocationData.newBuilder()
+                        .setLatitude(latitude.toInt())
+                        .setLongitude(longitude.toInt())
+                        .build()
+                    val dataBytes = locationProto.toByteArray()
+                    writeDataToLocationCharacteristic(dataBytes)
+                }
                 delay(periodMillis)
             }
             Log.i(TAG, "Sensor polling loop ended. isActive: $isActive, gatt: ${connectedGatt != null}, servicesDiscovered: ${_connectedPeripheral.value?.servicesDiscovered}")

@@ -35,7 +35,6 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.buzzverse.buzzapp.R
 import dev.buzzverse.buzzapp.model.DiscoveredPeripheral
-import dev.buzzverse.buzzapp.model.LocationData
 import dev.buzzverse.buzzapp.service.BluetoothViewModel
 import dev.buzzverse.buzzapp.ui.composables.SensorChart
 
@@ -53,7 +52,6 @@ fun BluetoothDevicesScreen(
         viewModel.initializeBluetoothComponents()
     }
 
-    // Control scanning based on screen lifecycle and connection state
     DisposableEffect(viewModel, lifecycleOwner, connectedPeripheral, isConnecting) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -150,9 +148,6 @@ fun PeripheralItem(
 @Composable
 fun ConnectedPeripheralView(peripheral: DiscoveredPeripheral, viewModel: BluetoothViewModel) {
     val history by viewModel.sensorHistory.collectAsState()
-    // val currentSensorData by viewModel.connectedPeripheral.collectAsState()?.sensorData - This is tricky.
-    // We already have `peripheral.sensorData` passed in, which should be updated by the ViewModel.
-
     val scrollState = rememberScrollState()
 
     Column(
@@ -176,24 +171,6 @@ fun ConnectedPeripheralView(peripheral: DiscoveredPeripheral, viewModel: Bluetoo
                     Text("Humidity: ${sensorData?.humidity?.let { "%.1f".format(it) } ?: "N/A"} %")
                     Text("Pressure: ${sensorData?.pressure?.let { "%.0f".format(it) } ?: "N/A"} hPa")
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = {
-                        val locationProto = LocationData.newBuilder()
-                            .setAltitude(1234)
-                            .setLatitude(34567890) // Example: 34.567890
-                            .setLongitude(-123456789) // Example: -123.456789
-                            .build()
-                        val dataBytes = locationProto.toByteArray()
-                        viewModel.writeDataToLocationCharacteristic(dataBytes) // Method name was writeDataToSensorCharacteristic, should be for LOCATION_CHARACTERISTIC_UUID
-                    }) {
-                        Text("Write Location")
-                    }
-                    // Add other action buttons if needed
-                }
-
 
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = { viewModel.disconnectFromDevice() }) {
