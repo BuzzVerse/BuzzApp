@@ -21,13 +21,5 @@ data class DiscoveredPeripheral(
             }
         }
 
-    val id: String
-        @SuppressLint("MissingPermission")
-        get() {
-            return try {
-                device.address
-            } catch (e: SecurityException) {
-                "No Address (Permission Denied)"
-            }
-        }
+    val id: String = device.address ?: java.util.UUID.randomUUID().toString()
 }
