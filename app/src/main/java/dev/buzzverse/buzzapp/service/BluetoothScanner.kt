@@ -218,7 +218,6 @@ class BluetoothViewModel @Inject constructor(
     }
 
     fun startScan() {
-        // ... (reszta kodu bez zmian)
         if (!viewModelScope.isActive) {
             Log.w(TAG, "Scan attempt while ViewModel scope is not active. Aborting.")
             return
@@ -252,7 +251,7 @@ class BluetoothViewModel @Inject constructor(
             Log.w(TAG, "Scan already in progress (internalScanActive was true). Ignoring startScan request.")
             return
         }
-        Log.i(TAG, "Starting BLE scan...")
+
         _isScanning.value = true
         _discoveredPeripherals.value = emptyList()
         scanUpdateJob?.cancel()
@@ -289,8 +288,6 @@ class BluetoothViewModel @Inject constructor(
     }
 
     private fun stopScanInternally(reason: String) {
-        // ... (reszta kodu bez zmian)
-        Log.i(TAG, "Attempting to stop scan internally. Reason: $reason. Current internalScanActive: ${internalScanActive.get()}")
         scanUpdateJob?.cancel()
         synchronized(scanResultBuffer) {
             scanResultBuffer.clear()
@@ -308,7 +305,6 @@ class BluetoothViewModel @Inject constructor(
             return
         }
         try {
-            Log.i(TAG, "Calling bluetoothLeScanner.stopScan for reason: $reason...")
             bluetoothLeScanner?.stopScan(leScanCallback)
             Log.i(TAG, "Scan successfully stopped via system call for reason: $reason.")
         } catch (e: IllegalStateException) {
@@ -321,7 +317,6 @@ class BluetoothViewModel @Inject constructor(
     }
 
     private val leScanCallback = object : ScanCallback() {
-        // ... (reszta kodu bez zmian)
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             if (!internalScanActive.get() && !_isScanning.value) return
 
@@ -357,12 +352,10 @@ class BluetoothViewModel @Inject constructor(
             synchronized(scanResultBuffer) { scanResultBuffer.clear() }
 
             val errorMsg = when (errorCode) {
-                ScanCallback.SCAN_FAILED_ALREADY_STARTED -> "SCAN_FAILED_ALREADY_STARTED"
-                ScanCallback.SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> "SCAN_FAILED_APPLICATION_REGISTRATION_FAILED"
-                ScanCallback.SCAN_FAILED_INTERNAL_ERROR -> "SCAN_FAILED_INTERNAL_ERROR"
-                ScanCallback.SCAN_FAILED_FEATURE_UNSUPPORTED -> "SCAN_FAILED_FEATURE_UNSUPPORTED"
-                //ScanCallback.SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES -> "SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES" // Deprecated
-                6 -> "SCAN_FAILED_SCANNING_TOO_FREQUENTLY (often SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES or similar)"
+                SCAN_FAILED_ALREADY_STARTED -> "SCAN_FAILED_ALREADY_STARTED"
+                SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> "SCAN_FAILED_APPLICATION_REGISTRATION_FAILED"
+                SCAN_FAILED_INTERNAL_ERROR -> "SCAN_FAILED_INTERNAL_ERROR"
+                SCAN_FAILED_FEATURE_UNSUPPORTED -> "SCAN_FAILED_FEATURE_UNSUPPORTED"
                 else -> "Unknown scan error code: $errorCode"
             }
             Log.e(TAG, "Scan Error: $errorMsg")
@@ -371,7 +364,6 @@ class BluetoothViewModel @Inject constructor(
 
     @SuppressLint("MissingPermission")
     private fun processScanResultBuffer() {
-        // ... (reszta kodu bez zmian)
         if (!viewModelScope.isActive) return
 
         val resultsToProcess: List<ScanResult>
@@ -419,7 +411,6 @@ class BluetoothViewModel @Inject constructor(
 
     @SuppressLint("MissingPermission")
     fun connectToDevice(peripheral: DiscoveredPeripheral) {
-        // ... (reszta kodu bez zmian)
         Log.i(TAG, "Attempting to connect to ${peripheral.displayName} (${peripheral.device.address})")
         if (bluetoothAdapter?.isEnabled != true) {
             Log.w(TAG, "Connect aborted: Bluetooth is not enabled.")
@@ -452,7 +443,7 @@ class BluetoothViewModel @Inject constructor(
         }
     }
 
-    fun disconnectFromDevice(notifyUser: Boolean = true) { // Dodajemy flagę
+    fun disconnectFromDevice(notifyUser: Boolean = true) {
         Log.i(TAG, "disconnectFromDevice called. Current GATT: ${connectedGatt?.device?.address}, Notify: $notifyUser")
         stopSensorPolling()
         val gattToDisconnect = connectedGatt
@@ -466,8 +457,6 @@ class BluetoothViewModel @Inject constructor(
         Log.i(TAG, "Requesting GATT disconnect from ${gattToDisconnect.device.address}")
         try {
             gattToDisconnect.disconnect()
-            // Nie wywołuj cleanupConnection tutaj bezpośrednio, onConnectionStateChange powinno to zrobić
-            // Jeśli to jawne rozłączenie, możemy ustawić flagę, aby nie restartować skanowania
         } catch (e: Exception) {
             Log.e(TAG, "Exception during gatt.disconnect(): ${e.message}")
             cleanupConnection("Exception during gatt.disconnect()", notifyUser)
@@ -478,7 +467,7 @@ class BluetoothViewModel @Inject constructor(
         Log.i(TAG, "Cleaning up connection. Reason: $reason. Notify: $notifyUser. Current GATT: ${connectedGatt?.device?.address}, Target: ${_connectedPeripheral.value?.device?.address}")
         stopSensorPolling()
 
-        val previouslyConnectedDevice = _connectedPeripheral.value // Zapamiętaj przed wyczyszczeniem
+        val previouslyConnectedDevice = _connectedPeripheral.value
         val gatt = connectedGatt
         connectedGatt = null
 
@@ -555,10 +544,7 @@ class BluetoothViewModel @Inject constructor(
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 if (gatt == connectedGatt || deviceAddress == currentTargetPeripheral?.device?.address) {
                     Log.i(TAG, "Disconnected from $deviceName ($deviceAddress), status: $statusString ($status)")
-                    // Tutaj decydujemy, czy powiadomić. Jeśli `status != GATT_SUCCESS`, to prawdopodobnie nieoczekiwane rozłączenie.
-                    // Jeśli `status == GATT_SUCCESS` i `disconnectFromDevice` było wywołane, to `notifyUser` tam kontroluje.
-                    // Dla prostoty, jeśli `currentTargetPeripheral` był ustawiony, to znaczy, że byliśmy połączeni (lub próbowaliśmy).
-                    val shouldNotify = currentTargetPeripheral != null && status != BluetoothGatt.GATT_SUCCESS // Powiadom, jeśli nie było to "czyste" rozłączenie
+                    val shouldNotify = currentTargetPeripheral != null && status != BluetoothGatt.GATT_SUCCESS
                     cleanupConnection("Disconnected (Status: $statusString) for $deviceAddress", notifyUser = shouldNotify)
                 } else {
                     Log.w(TAG, "Received disconnect for non-target/non-active gatt $deviceAddress. Current gatt: ${connectedGatt?.device?.address}, target: ${currentTargetPeripheral?.device?.address}. Closing this rogue gatt.")
@@ -566,7 +552,7 @@ class BluetoothViewModel @Inject constructor(
                 }
             }
         }
-        // ... (reszta callbacków bez zmian, upewnij się, że wywołują cleanupConnection z odpowiednim notifyUser jeśli trzeba)
+
         @SuppressLint("MissingPermission")
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             val deviceAddress = gatt.device.address
@@ -660,7 +646,6 @@ class BluetoothViewModel @Inject constructor(
 
 
     fun readSensorData() {
-        // ... (reszta kodu bez zmian)
         val gatt = connectedGatt ?: run { Log.e(TAG, "readSensorData: GATT not available."); return }
         if (_connectedPeripheral.value?.servicesDiscovered != true) {
             Log.w(TAG, "readSensorData: Services not discovered yet for ${gatt.device.address}.")
@@ -680,7 +665,6 @@ class BluetoothViewModel @Inject constructor(
     }
 
     fun writeDataToLocationCharacteristic(data: ByteArray) {
-        // ... (reszta kodu bez zmian)
         val gatt = connectedGatt ?: run { Log.e(TAG, "writeDataToLocationCharacteristic: GATT not available."); return }
         if (_connectedPeripheral.value?.servicesDiscovered != true) {
             Log.w(TAG, "writeDataToLocationCharacteristic: Services not discovered yet for ${gatt.device.address}.")
@@ -716,7 +700,6 @@ class BluetoothViewModel @Inject constructor(
     }
 
     private fun startSensorPolling(periodMillis: Long = 5_000L) {
-        // ... (reszta kodu bez zmian)
         if (pollingJob?.isActive == true) {
             Log.d(TAG, "Sensor polling already active.")
             return
@@ -734,7 +717,6 @@ class BluetoothViewModel @Inject constructor(
     }
 
     private fun stopSensorPolling() {
-        // ... (reszta kodu bez zmian)
         if (pollingJob?.isActive == true) {
             Log.i(TAG, "Stopping sensor polling for ${connectedGatt?.device?.address}.")
             pollingJob?.cancel()
@@ -778,7 +760,6 @@ class BluetoothViewModel @Inject constructor(
     }
 
     private fun gattProfileStateToString(state: Int): String {
-        // ... (reszta kodu bez zmian)
         return when (state) {
             BluetoothProfile.STATE_DISCONNECTED -> "DISCONNECTED"
             BluetoothProfile.STATE_CONNECTING -> "CONNECTING"
