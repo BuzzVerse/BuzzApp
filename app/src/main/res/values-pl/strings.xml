@@ -2,4 +2,20 @@
 <resources>
     <string name="connect">Połącz</string>
     <string name="devices">Urządzenia</string>
+    <string name="disconnect">Rozłącz</string>
+    <string name="connecting_to_device">Łączenie z %1$s...</string>
+    <string name="default_device_name">urządzenie</string>
+    <string name="scanning_for_devices">Skanowanie w poszukiwaniu urządzeń...</string>
+    <string name="no_devices_found_prompt">Nie znaleziono urządzeń. Upewnij się, że Bluetooth i Lokalizacja są włączone. Skanowanie może rozpocząć się automatycznie.</string>
+    <string name="rssi_label">RSSI: %1$s</string>
+    <string name="not_available">brak danych</string>
+    <string name="connected_to_label">Połączono z: %1$s</string>
+    <string name="address_label">Adres: %1$s</string>
+    <string name="sensor_data_title">Dane z czujników:</string>
+    <string name="temperature_label">Temperatura: %1$s °C</string>
+    <string name="humidity_label">Wilgotność: %1$s %%</string>
+    <string name="pressure_label">Ciśnienie: %1$s hPa</string>
+    <string name="sensor_history_title">Historia czujników:</string>
+    <string name="notification_disconnect_title">Połączenie utracone</string>
+    <string name="notification_disconnect_text">Utracono połączenie z urządzeniem: %1$s</string>
 </resources>

@@ -2,4 +2,20 @@
     <string name="app_name" translatable="false">BuzzApp</string>
     <string name="connect">Connect</string>
     <string name="devices">Devices</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="connecting_to_device">Connecting to %1$s...</string>
+    <string name="default_device_name">device</string>
+    <string name="scanning_for_devices">Scanning for devices...</string>
+    <string name="no_devices_found_prompt">No devices found. Ensure Bluetooth Location are on. Scan might start automatically.</string>
+    <string name="rssi_label">RSSI: %1$s</string>
+    <string name="not_available">N/A</string>
+    <string name="connected_to_label">Connected to: %1$s</string>
+    <string name="address_label">Address: %1$s</string>
+    <string name="sensor_data_title">Sensor Data:</string>
+    <string name="temperature_label">Temperature: %1$s °C</string>
+    <string name="humidity_label">Humidity: %1$s %%</string>
+    <string name="pressure_label">Pressure: %1$s hPa</string>
+    <string name="sensor_history_title">Sensor History:</string>
+    <string name="notification_disconnect_title">Connection Lost</string>
+    <string name="notification_disconnect_text">Lost connection to device: %1$s</string>
 </resources>

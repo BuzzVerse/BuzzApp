@@ -81,8 +81,10 @@ fun BluetoothDevicesScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (isConnecting) {
-            Text("Connecting to ${viewModel.connectedPeripheral.value?.displayName ?: "device"}...")
+            val deviceName = viewModel.connectedPeripheral.value?.displayName ?: stringResource(id = R.string.default_device_name)
+            Text(stringResource(id = R.string.connecting_to_device, deviceName))
             CircularProgressIndicator()
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
         connectedPeripheral?.let { peripheral ->
@@ -90,12 +92,12 @@ fun BluetoothDevicesScreen(
         } ?: run {
             if (isScanning && discoveredPeripherals.isEmpty() && !isConnecting) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Scanning for devices...")
+                    Text(stringResource(id = R.string.scanning_for_devices))
                     Spacer(modifier = Modifier.height(8.dp))
                     CircularProgressIndicator()
                 }
             } else if (!isScanning && discoveredPeripherals.isEmpty() && !isConnecting) {
-                Text("No devices found. Ensure Bluetooth & Location are on. Scan might start automatically or press 'Start Scan'.")
+                Text(stringResource(id = R.string.no_devices_found_prompt))
             }
             DiscoveredPeripheralsList(
                 peripherals = discoveredPeripherals,
@@ -134,11 +136,15 @@ fun PeripheralItem(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
+        val notAvailable = stringResource(id = R.string.not_available)
         Column(modifier = Modifier.weight(1f)) {
             Text(peripheral.displayName, style = MaterialTheme.typography.titleMedium)
             Text(peripheral.device.address, style = MaterialTheme.typography.bodySmall)
         }
-        Text("RSSI: ${peripheral.rssi ?: "N/A"}", modifier = Modifier.padding(horizontal = 8.dp))
+        Text(
+            text = stringResource(id = R.string.rssi_label, peripheral.rssi?.toString() ?: notAvailable),
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
         Button(onClick = onConnect) {
             Text(stringResource(id = R.string.connect))
         }
@@ -149,6 +155,7 @@ fun PeripheralItem(
 fun ConnectedPeripheralView(peripheral: DiscoveredPeripheral, viewModel: BluetoothViewModel) {
     val history by viewModel.sensorHistory.collectAsState()
     val scrollState = rememberScrollState()
+    val notAvailable = stringResource(id = R.string.not_available)
 
     Column(
         modifier = Modifier
@@ -158,31 +165,50 @@ fun ConnectedPeripheralView(peripheral: DiscoveredPeripheral, viewModel: Bluetoo
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    "Connected to: ${peripheral.displayName}",
+                    text = stringResource(id = R.string.connected_to_label, peripheral.displayName),
                     style = MaterialTheme.typography.titleLarge
                 )
-                Text("Address: ${peripheral.device.address}")
-                Text("RSSI: ${peripheral.rssi ?: "N/A"}") // This updates if readRemoteRssi is called
+                Text(stringResource(id = R.string.address_label, peripheral.device.address))
+                Text(stringResource(id = R.string.rssi_label, peripheral.rssi?.toString() ?: notAvailable))
 
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Sensor Data:", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(id = R.string.sensor_data_title), style = MaterialTheme.typography.titleMedium)
                 peripheral.sensorData.let { sensorData ->
-                    Text("Temperature: ${sensorData?.temperature?.let { "%.1f".format(it) } ?: "N/A"} °C")
-                    Text("Humidity: ${sensorData?.humidity?.let { "%.1f".format(it) } ?: "N/A"} %")
-                    Text("Pressure: ${sensorData?.pressure?.let { "%.0f".format(it) } ?: "N/A"} hPa")
+                    Text(
+                        stringResource(
+                            id = R.string.temperature_label,
+                            sensorData?.temperature?.let { "%.1f".format(it) } ?: notAvailable
+                        )
+                    )
+                    Text(
+                        stringResource(
+                            id = R.string.humidity_label,
+                            sensorData?.humidity?.let { "%.1f".format(it) } ?: notAvailable
+                        )
+                    )
+                    Text(
+                        stringResource(
+                            id = R.string.pressure_label,
+                            sensorData?.pressure?.let { "%.0f".format(it) } ?: notAvailable
+                        )
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = { viewModel.disconnectFromDevice() }) {
-                    Text("Disconnect")
+                    Text(stringResource(id = R.string.disconnect))
                 }
             }
         }
 
         if (history.isNotEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Sensor History:", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp))
-            SensorChart(samples = history, modifier = Modifier.padding(top = 8.dp).height(200.dp)) // Give chart a fixed height or aspect ratio
+            Text(
+                text = stringResource(id = R.string.sensor_history_title),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 16.dp)
+            )
+            SensorChart(samples = history, modifier = Modifier.padding(top = 8.dp).height(200.dp))
         }
     }
 }
